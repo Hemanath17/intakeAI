@@ -2,6 +2,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Callable, Optional
 from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class SlotGroup(str, Enum):
     CONTACT = "contact"
@@ -43,13 +44,12 @@ class DefendantType(str, Enum):
     UNKNOWN = "unknown"
 
 class SlotDefinition(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     name: str
     group: SlotGroup
     required: bool
     conditional_on: Optional[Callable[[dict], bool]] = None
-
-    class Config:
-        arbitrary_types_allowed = True
 
 SLOT_REGISTRY: list[SlotDefinition] = [
     SlotDefinition(name="caller_name", group=SlotGroup.CONTACT, required=True),

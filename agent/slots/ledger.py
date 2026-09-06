@@ -9,12 +9,12 @@ MAX_ASK_ATTEMPTS = 3
 
 GROUP_ORDER = [
     SlotGroup.MATTER,
+    SlotGroup.CONTACT,
     SlotGroup.INJURY,
     SlotGroup.LIABILITY,
     SlotGroup.EVIDENCE,
     SlotGroup.PARTY,
     SlotGroup.SCREENING,
-    SlotGroup.CONTACT,
     SlotGroup.OPS,
 ]
 
@@ -66,9 +66,13 @@ def get_next_unasked(ledger: dict[str, SlotState]) -> Optional[str]:
 
 def mark_asked(ledger: dict[str, SlotState], slot_name: str, turn: int) -> None:
     state = ledger[slot_name]
-    state.status = SlotStatus.ASKED
     state.asked_count += 1
     state.last_asked_turn = turn
+    if state.asked_count >= MAX_ASK_ATTEMPTS:
+        state.status = SlotStatus.REFUSED
+    else:
+        state.status = SlotStatus.ASKED
+
 
 def record_answer(
     ledger: dict[str, SlotState],

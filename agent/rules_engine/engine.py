@@ -54,6 +54,14 @@ def _parse_date(value) -> Optional[date]:
             return None
     return None
 
+def _is_minor(dob) -> bool:
+    dob = _parse_date(dob)
+    if dob is None:
+        return False
+    today = date.today()
+    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    return age < 18
+
 def _days_elapsed(start: date, today: date) -> int:
     return (today - start).days
 
@@ -143,7 +151,7 @@ def _rule_limitations(record: dict, today: date) -> list[Flag]:
                       f"{gov_rule['notice_days']} days in {state}; about {notice_remaining} days remain")
         flags.append(Flag(rule="government_notice", detail=detail, severity="high",
                           requires_attorney=True, disposition_hint=Disposition.DEADLINE_REVIEW_REQUIRED))
-    if record.get("claimant_is_minor") is True:
+    if _is_minor(record.get("claimant_dob")):
         flags.append(Flag(
             rule="minor_tolling",
             detail="Claimant is a minor; limitations period is likely tolled — deadline math above is not reliable",
@@ -204,6 +212,26 @@ def _rule_screening(record: dict) -> list[Flag]:
             disposition_hint=Disposition.STANDARD_INTAKE_REVIEW,
         ))
     return flags
+
+def _rule_insurance_contact(record: dict) -> list[Flag]:
+    flags = []
+    if record.get("gave_recorded_statement") is True:
+        flags.append(Flag(
+            rule="recorded_statement_given",
+            detail="Caller reports giving a recorded statement to an insurance adjuster; "
+                   "may affect case value — urgent attorney review, advise caller to stop further contact",
+            severity="high", requires_attorney=True,
+            disposition_hint=Disposition.PRIORITY_ATTORNEY_REVIEW,
+        ))
+    elif record.get("insurance_contacted") is True:
+        flags.append(Flag(
+            rule="insurance_contact",
+            detail="Adjuster has contacted the caller; advise against further statements until attorney review",
+            severity="medium", requires_attorney=True,
+            disposition_hint=Disposition.STANDARD_INTAKE_REVIEW,
+        ))
+    return flags
+
 def _rule_completeness(unresolved_slots: Optional[list[str]]) -> list[Flag]:
     if not unresolved_slots:
         return []
@@ -221,6 +249,7 @@ def evaluate(record: dict, unresolved_slots: Optional[list[str]] = None,
     flags.extend(_rule_severity(record))
     flags.extend(_rule_limitations(record, today))
     flags.extend(_rule_screening(record))
+    flags.extend(_rule_insurance_contact(record))
     flags.extend(_rule_completeness(unresolved_slots))
     hints = {f.disposition_hint for f in flags if f.disposition_hint}
     disposition = next((d for d in DISPOSITION_PRIORITY if d in hints),

@@ -55,6 +55,7 @@ SLOT_REGISTRY: list[SlotDefinition] = [
     SlotDefinition(name="caller_name", group=SlotGroup.CONTACT, required=True),
     SlotDefinition(name="caller_phone", group=SlotGroup.CONTACT, required=True),
     SlotDefinition(name="caller_email", group=SlotGroup.CONTACT, required=False),
+    SlotDefinition(name="caller_state", group=SlotGroup.CONTACT, required=True),
 
     SlotDefinition(name="caller_is_claimant", group=SlotGroup.PARTY, required=True),
     SlotDefinition(
@@ -69,6 +70,7 @@ SLOT_REGISTRY: list[SlotDefinition] = [
         name="authority_basis", group=SlotGroup.PARTY, required=False,
         conditional_on=lambda s: s.get("caller_is_claimant") is False,
     ),
+    SlotDefinition(name="claimant_dob", group=SlotGroup.PARTY, required=False),
 
     SlotDefinition(name="incident_type", group=SlotGroup.MATTER, required=True),
     SlotDefinition(name="incident_date", group=SlotGroup.MATTER, required=True),
@@ -100,10 +102,13 @@ SLOT_REGISTRY: list[SlotDefinition] = [
         conditional_on=lambda s: s.get("other_party_identified") is True,
     ),
     SlotDefinition(name="fault_narrative", group=SlotGroup.LIABILITY, required=False),
+    SlotDefinition(name="insurance_contacted", group=SlotGroup.LIABILITY, required=False),
+    SlotDefinition(name="gave_recorded_statement", group=SlotGroup.LIABILITY, required=False),
 
     SlotDefinition(name="existing_representation", group=SlotGroup.SCREENING, required=True),
     SlotDefinition(name="conflict_parties", group=SlotGroup.SCREENING, required=True),
 
     SlotDefinition(name="preferred_language", group=SlotGroup.OPS, required=False),
     SlotDefinition(name="best_callback_time", group=SlotGroup.OPS, required=False),
+    SlotDefinition(name="marketing_source", group=SlotGroup.OPS, required=False),
 ]

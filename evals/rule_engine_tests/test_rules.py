@@ -19,7 +19,7 @@ BASE_RECORD = {
     "conflict_parties": [],
     "defendant_type": None,
     "currently_hospitalised": False,
-    "claimant_is_minor": False,
+    "claimant_dob": None,
 }
 
 
@@ -96,7 +96,7 @@ def test_deadline_may_have_closed():
 
 def test_minor_tolling_overrides_confidence():
     result = evaluate(
-        record(incident_date=date(2020, 1, 1), incident_state="AZ", claimant_is_minor=True),
+        record(incident_date=date(2020, 1, 1), incident_state="AZ", claimant_dob=date(2015, 1, 1)),
         today=TODAY,
     )
     names = flag_names(result)

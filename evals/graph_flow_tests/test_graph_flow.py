@@ -34,7 +34,7 @@ def test_repeated_reask_when_extraction_finds_nothing():
     assert state["next_action"] == "reask"
     assert state["pending_slot"] == "incident_type"
     assert state["ledger"]["incident_type"].asked_count == 3
-    assert state["ledger"]["incident_type"].status == SlotStatus.ASKED
+    assert state["ledger"]["incident_type"].status == SlotStatus.REFUSED
 
 
 def test_graph_advances_once_extraction_succeeds():

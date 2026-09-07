@@ -1,4 +1,5 @@
 from graph.state import IntakeState
+from slots.ledger import record_answer
 
 STATE_NAMES = {
     "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA",
@@ -72,10 +73,17 @@ def jurisdiction_resolve(state: IntakeState) -> dict:
         }}
 
     if normalized in CITY_TO_STATE:
-        return {"jurisdiction": {
-            "raw_mention": raw, "state_code": CITY_TO_STATE[normalized],
-            "confirmed": False, "needs_confirmation": True,
-        }}
+        resolved = CITY_TO_STATE[normalized]
+        ledger = state["ledger"]
+        if ledger["incident_state"].value is None:
+            record_answer(ledger, "incident_state", resolved, 0.9)
+        return {
+            "jurisdiction": {
+                "raw_mention": raw, "state_code": resolved,
+                "confirmed": False, "needs_confirmation": True,
+            },
+            "ledger": ledger,
+        }
 
     return {"jurisdiction": {
         "raw_mention": None, "state_code": None,

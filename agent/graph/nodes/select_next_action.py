@@ -13,7 +13,10 @@ def select_next_action(state: IntakeState) -> dict:
     if consent["status"] == "refused":
         return {"next_action": "consent_refused_close", "phase": Phase.CLOSE, "pending_slot": None}
 
-    if jurisdiction["needs_confirmation"]:
+    if state["empathy"].get("pause_active"):
+        return {"next_action": "empathy_pause", "pending_slot": None}
+
+    if jurisdiction["needs_confirmation"] and state.get("next_action") != "confirm_jurisdiction":
         return {"next_action": "confirm_jurisdiction", "pending_slot": None}
 
     reask_targets = get_reask_targets(ledger)

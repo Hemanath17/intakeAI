@@ -1,4 +1,5 @@
 from graph.state import IntakeState
+from guardrails.validator import validate
 from llm.groq_client import generate_text
 from slots.ledger import SlotStatus, mark_asked
 
@@ -51,6 +52,12 @@ FIXED_REPLIES = {
     ),
 }
 
+RELATION_MAP = {
+    "child": "mother or father", "daughter": "mother", "son": "mother",
+    "mother": "mother", "father": "father", "spouse": "spouse",
+    "wife": "wife", "husband": "husband",
+}
+
 
 def _summarize_known_facts(ledger: dict) -> str:
     lines = []
@@ -60,11 +67,65 @@ def _summarize_known_facts(ledger: dict) -> str:
     return "; ".join(lines) if lines else "no details captured yet"
 
 
+RELATION_SLOTS = {"claimant_name", "claimant_condition", "claimant_dob"}
+
+
+def _personalise(need: str, pending_slot: str, ledger: dict) -> str:
+    if pending_slot not in RELATION_SLOTS:
+        return need
+    relation = ledger["authority_basis"].value
+    if not relation:
+        return need
+    relation = str(relation).lower()
+    mapping = {
+        "child": "mother or father",
+        "daughter": "mother",
+        "son": "mother",
+        "mother": "mother",
+        "father": "father",
+        "spouse": "spouse",
+        "wife": "wife",
+        "husband": "husband",
+    }
+    person = mapping.get(relation, relation)
+    if pending_slot == "claimant_name":
+        return f"the name of their {person}"
+    if pending_slot == "claimant_condition":
+        return f"how their {person} is doing right now"
+    return f"their {person}'s date of birth"
+
+
 def _build_prompt(state: IntakeState, next_action: str, pending_slot: str) -> str:
     latest_text = state["turns"][-1]["text"]
+    ledger = state["ledger"]
+
+    if next_action == "empathy_pause":
+        relation = ledger["authority_basis"].value
+        person = RELATION_MAP.get(str(relation).lower(), "loved one") if relation else "loved one"
+        tier = state["severity_signal"].get("tier")
+        deceased = getattr(tier, "value", str(tier)) == "fatal"
+        if deceased:
+            return (
+                "The caller has just described a death. Express sincere condolences in one sentence. "
+                "Do not ask any question this turn. Do not ask how the person is doing."
+            )
+        return (
+            f"The caller has just described a catastrophic injury. Acknowledge it with genuine warmth, "
+            f"then ask how their {person} is doing right now. Nothing else."
+        )
 
     if next_action in ("ask_slot", "reask"):
         need = SLOT_DESCRIPTIONS.get(pending_slot, pending_slot)
+        need = _personalise(need, pending_slot, ledger)
+
+        attempt = ledger[pending_slot].asked_count if pending_slot in ledger else 0
+        if attempt >= 1:
+            return (
+                f'The caller just said: "{latest_text}". '
+                f'You already asked about {need} and did not get it. '
+                f'Briefly acknowledge what they just said, then rephrase the question differently '
+                f'and more specifically. Do not repeat your previous wording.'
+            )
         return f'The caller just said: "{latest_text}". You still need to find out: {need}.'
 
     if next_action == "confirm_jurisdiction":
@@ -89,10 +150,14 @@ def compose_reply(state: IntakeState) -> dict:
         return {"reply": FIXED_REPLIES[next_action]}
 
     prompt = _build_prompt(state, next_action, pending_slot)
-    reply_text = generate_text(prompt, system=SYSTEM_PROMPT)
+    raw_reply = generate_text(prompt, system=SYSTEM_PROMPT)
+
+    result = validate(raw_reply, pending_slot)
+    reply_text = raw_reply if result.passed else result.safe_text
+    guardrail_violations = result.violations
 
     ledger = state["ledger"]
     if next_action in ("ask_slot", "reask") and pending_slot:
         mark_asked(ledger, pending_slot, state["turn_count"])
 
-    return {"reply": reply_text, "ledger": ledger}
+    return {"reply": reply_text, "ledger": ledger, "guardrail_violations": guardrail_violations}

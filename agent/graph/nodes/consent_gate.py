@@ -1,24 +1,7 @@
-import re
-
+from graph.nodes.reply_parser import parse_yes_no
 from graph.state import IntakeState
 from rules_engine.tables.consent_table import get_consent_requirement
 from slots.ledger import SlotStatus
-
-AGREE_PHRASES = ["yes", "yeah", "yep", "sure", "that's fine", "go ahead", "okay", "ok", "fine with that", "no problem"]
-REFUSE_PHRASES = ["no", "nope", "i don't want", "i do not want", "i'd rather not", "not comfortable", "prefer not", "don't record"]
-
-
-def _matches_any(text: str, phrases: list[str]) -> bool:
-    lowered = text.lower()
-    return any(re.search(rf"\b{re.escape(phrase)}\b", lowered) for phrase in phrases)
-
-
-def _check_consent_reply(text: str) -> str:
-    if _matches_any(text, AGREE_PHRASES):
-        return "granted"
-    if _matches_any(text, REFUSE_PHRASES):
-        return "refused"
-    return "unclear"
 
 
 def consent_gate(state: IntakeState) -> dict:
@@ -39,10 +22,10 @@ def consent_gate(state: IntakeState) -> dict:
 
     if consent["status"] == "pending":
         latest_text = state["turns"][-1]["text"]
-        reply = _check_consent_reply(latest_text)
-        if reply == "granted":
+        reply = parse_yes_no(latest_text)
+        if reply == "yes":
             return {"consent": {"required": True, "status": "granted"}}
-        if reply == "refused":
+        if reply == "no":
             return {"consent": {"required": True, "status": "refused"}}
         return {}
 

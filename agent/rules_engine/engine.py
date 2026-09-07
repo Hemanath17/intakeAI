@@ -71,7 +71,7 @@ def _rule_severity(record: dict) -> list[Flag]:
     if severity in (InjurySeverity.SEVERE, InjurySeverity.CATASTROPHIC, InjurySeverity.FATAL):
         flags.append(Flag(
             rule="catastrophic_severity",
-            detail=f"Reported severity is {severity}; immediate attorney attention warranted",
+            detail=f"Reported severity is {getattr(severity, 'value', severity)}; immediate attorney attention warranted",
             severity="high", requires_attorney=True,
             disposition_hint=Disposition.PRIORITY_ATTORNEY_REVIEW,
         ))
@@ -119,7 +119,11 @@ def _rule_limitations(record: dict, today: date) -> list[Flag]:
     elif incident_type == IncidentType.MEDICAL_MALPRACTICE:
         anchor_note = " (discovery rule may shift the start date)"
     gov_rule = None
-    if record.get("defendant_type") in ("transit_authority", "government_entity"):
+    defendant_types = record.get("defendant_type") or []
+    if not isinstance(defendant_types, list):
+        defendant_types = [defendant_types]
+    if any(str(d) in ("transit_authority", "government_entity", "DefendantType.TRANSIT_AUTHORITY",
+                      "DefendantType.GOVERNMENT_ENTITY") for d in defendant_types):
         gov_rule = get_government_defendant_rule(state)
         if gov_rule and gov_rule["entity_years"]:
             window_days = min(window_days, int(gov_rule["entity_years"] * 365.25))
